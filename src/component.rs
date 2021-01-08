@@ -10,14 +10,14 @@ pub trait Component: Sized {
     type InboundMessage;
     type OutboundMessage;
 
-    fn start(&'static mut self, ctx: ComponentStartContext<Self>);
+    fn start(&'static mut self, ctx: &'static ComponentStartContext<Self>) {}
 }
 
 pub struct ComponentStartContext<C: Component>
     where C::OutboundMessage: 'static
 {
-    consumer: RefCell<AsyncConsumer<'static, C::InboundMessage, U32>>,
-    sink: &'static dyn Sink<C::OutboundMessage>,
+    pub(crate) consumer: RefCell<AsyncConsumer<'static, C::InboundMessage, U32>>,
+    pub(crate) sink: &'static dyn Sink<C::OutboundMessage>,
 }
 
 impl<C: Component> ComponentStartContext<C> {
@@ -37,8 +37,11 @@ impl<C: Component> ComponentContext<C> {}
 /// Wraps and takes ownership of a component.
 /// Provides an async FIFO between the holder of the context
 /// and the component's spawned tasks.
-pub struct ComponentContext<C: Component> {
+pub struct ComponentContext<C: Component>
+    where C: 'static
+{
     component: UnsafeCell<C>,
+    context: UnsafeCell<Option<ComponentStartContext<C>>>,
     fifo: UnsafeCell<AsyncFifo<C, U32>>,
     producer: RefCell<Option<AsyncProducer<'static, C::InboundMessage, U32>>>,
 }
@@ -47,6 +50,7 @@ impl<C: Component> ComponentContext<C> {
     pub fn new(component: C) -> Self {
         Self {
             component: UnsafeCell::new(component),
+            context: UnsafeCell::new(None),
             fifo: UnsafeCell::new(AsyncFifo::new()),
             producer: RefCell::new(None),
         }
@@ -63,7 +67,12 @@ impl<C: Component> ComponentContext<C> {
             sink: container,
         };
 
-        unsafe { (&mut *self.component.get()) }.start(start_context);
+        unsafe {
+            (&mut *self.context.get()).replace(start_context);
+            (&mut *self.component.get()).start(
+                (&*self.context.get()).as_ref().unwrap()
+            );
+        }
     }
 
     pub fn send(&self, message: C::InboundMessage) {

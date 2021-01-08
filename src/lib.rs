@@ -9,7 +9,7 @@ mod macros;
 #[cfg(test)]
 mod tests {
     use crate::sink::Handler;
-    use crate::kernel::{Kernel, KernelContext};
+    use crate::kernel::{Kernel, KernelContext, KernelStartContext};
     use crate::container::{Container, ContainerStartContext, ContainerContext};
     use crate::component::{Component, ComponentStartContext, ComponentContext};
     use crate::interrupt::{Interrupt, InterruptContext};
@@ -36,7 +36,7 @@ mod tests {
         type InboundMessage = LEDState;
         type OutboundMessage = ();
 
-        fn start(&mut self, ctx: ComponentStartContext<Self>) {
+        fn start(&mut self, ctx: &'static ComponentStartContext<Self>) {
             println!("starting LED");
         }
     }
@@ -49,10 +49,20 @@ mod tests {
     impl Flashlight {}
 
     impl Container for Flashlight {
-        fn start(&'static self, context: &'static ContainerStartContext<Self>) {
+        fn start<K:Kernel>(&'static self, context: &'static ContainerStartContext<Self>) {
             self.led.start(context);
             self.button.start(context);
         }
+    }
+
+    pub enum FlashlightStatus {
+        On,
+        Off,
+    }
+
+    impl Component for Flashlight {
+        type InboundMessage = ();
+        type OutboundMessage = FlashlightStatus;
     }
 
     impl Handler<ButtonEvent> for Flashlight {
@@ -73,8 +83,8 @@ mod tests {
     }
 
     impl Kernel for Device {
-        fn start(&'static self) {
-            self.flashlight.start();
+        fn start(&'static self, ctx: &'static KernelStartContext<Self>) {
+            self.flashlight.start(ctx);
         }
     }
 
