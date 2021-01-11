@@ -1,6 +1,6 @@
 use core::task::Context as FutureContext;
 use core::cell::RefCell;
-use core::task::{Waker, Context, Poll};
+use core::task::{Waker, Poll};
 use crate::component::Component;
 use heapless::ArrayLength;
 use heapless::spsc::{Queue, Producer, Consumer};

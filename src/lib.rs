@@ -1,18 +1,21 @@
 #![no_std]
 
 mod fifo;
-mod sink;
-mod kernel;
-mod component;
-mod interrupt;
-mod macros;
+pub mod sink;
+pub mod kernel;
+pub mod component;
+pub mod interrupt;
+pub mod macros;
+pub mod context;
+
+pub extern crate drogue_async;
 
 #[cfg(test)]
 mod tests {
-    use crate::sink::{Handler, Sink};
-    use crate::kernel::{Kernel, ConnectedKernel, KernelContext};
+    use crate::sink::{Handler};
+    use crate::kernel::{Kernel, KernelContext, IrqRegistry};
     use crate::component::{Component, ComponentContext, ConnectedComponent};
-    use crate::interrupt::{Interrupt, ConnectedInterrupt};
+    use crate::interrupt::{Interrupt, ConnectedInterrupt, InterruptContext};
     use drogue_async::task::spawn;
 
     pub enum ButtonEvent {
@@ -24,6 +27,14 @@ mod tests {
 
     impl Interrupt for Button {
         type OutboundMessage = ButtonEvent;
+
+        fn on_interrupt(&mut self, context: &InterruptContext<Self>) {
+            unimplemented!()
+        }
+
+        fn irq(&self) -> u8 {
+            unimplemented!()
+        }
     }
 
     pub enum LEDState {
@@ -63,6 +74,11 @@ mod tests {
     impl Component for Flashlight {
         type InboundMessage = ();
         type OutboundMessage = FlashlightStatus;
+
+        fn start(&'static mut self, ctx: &'static ComponentContext<Self>) {
+            //self.led.start(ctx);
+            self.button.start(ctx);
+        }
     }
 
     impl Handler<ButtonEvent> for Flashlight {
@@ -107,6 +123,6 @@ mod tests {
             flashlight: ConnectedComponent::new(flashlight),
         };
 
-        device!( Device => kernel);
+        //device!( Device => kernel);
     }
 }
