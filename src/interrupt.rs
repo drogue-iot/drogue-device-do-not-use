@@ -1,7 +1,5 @@
-use crate::sink::{Sink};
 use core::cell::UnsafeCell;
 use crate::context::UpstreamContext;
-use crate::kernel::IrqRegistry;
 
 pub trait Interrupt: Sized {
     type OutboundMessage;
@@ -13,14 +11,14 @@ pub trait Interrupt: Sized {
 pub struct InterruptContext<I: Interrupt>
     where I: 'static
 {
-    interrupt: &'static ConnectedInterrupt<I>,
+    _interrupt: &'static ConnectedInterrupt<I>,
     upstream: &'static dyn UpstreamContext<I::OutboundMessage>,
 }
 
 impl<I: Interrupt> InterruptContext<I> {
     pub fn new(interrupt: &'static ConnectedInterrupt<I>, upstream: &'static dyn UpstreamContext<I::OutboundMessage>) -> Self {
         Self {
-            interrupt,
+            _interrupt: interrupt,
             upstream,
         }
     }
@@ -63,7 +61,7 @@ impl<I: Interrupt> ConnectedInterrupt<I> {
 }
 
 impl<I: Interrupt> Interruptable for ConnectedInterrupt<I> {
-    fn interrupt(&self, irqn: i16) {
+    fn interrupt(&self) {
         unsafe {
             (&mut *self.interrupt.get()).on_interrupt( (&*self.context.get()).as_ref().unwrap() );
         }
@@ -71,5 +69,5 @@ impl<I: Interrupt> Interruptable for ConnectedInterrupt<I> {
 }
 
 pub trait Interruptable {
-    fn interrupt(&self, irqn: i16);
+    fn interrupt(&self);
 }

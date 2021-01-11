@@ -1,4 +1,4 @@
-use crate::interrupt::{ConnectedInterrupt, Interruptable};
+use crate::interrupt::Interruptable;
 
 pub trait UpstreamContext<M> {
     fn send(&self, message: M);

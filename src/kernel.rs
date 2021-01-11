@@ -1,19 +1,20 @@
 use core::cell::UnsafeCell;
 use crate::sink::{Sink, Handler};
-use crate::component::Component;
 use crate::context::UpstreamContext;
 use crate::interrupt::Interruptable;
 use heapless::{
     Vec,
     consts::*,
 };
+use cortex_m::peripheral::NVIC;
+use cortex_m::interrupt::Nr;
 
-pub trait Kernel : Sized {
+pub trait Kernel: Sized {
     fn start(&'static self, ctx: &'static KernelContext<Self>);
 }
 
 pub struct ConnectedKernel<K: Kernel>
-where K: 'static
+    where K: 'static
 {
     kernel: UnsafeCell<K>,
     context: UnsafeCell<Option<KernelContext<K>>>,
@@ -36,12 +37,13 @@ impl<K: Kernel> ConnectedKernel<K> {
             (&mut *self.kernel.get()).start(
                 (&*self.context.get()).as_ref().unwrap()
             );
+            (&*self.irq_registry.get()).unmask_all();
         }
     }
 
     pub fn interrupt(&self, irqn: i16) {
         unsafe {
-            (&*self.irq_registry.get()).interrupt( irqn );
+            (&*self.irq_registry.get()).interrupt(irqn);
         }
     }
 }
@@ -68,7 +70,7 @@ impl<M, K: Kernel> Sink<M> for KernelContext<K>
     }
 }
 
-impl<M, K:Kernel> UpstreamContext<M> for KernelContext<K>
+impl<M, K: Kernel> UpstreamContext<M> for KernelContext<K>
     where K: Handler<M>
 {
     fn send(&self, message: M) {
@@ -77,15 +79,14 @@ impl<M, K:Kernel> UpstreamContext<M> for KernelContext<K>
 
     fn register_irq(&self, irq: u8, interrupt: &'static dyn Interruptable) {
         unsafe {
-            (&mut *self.kernel.irq_registry.get()).register( irq, interrupt);
+            (&mut *self.kernel.irq_registry.get()).register(irq, interrupt);
         }
     }
 }
 
-impl<K:Kernel> Handler<()> for K {
-    fn on_message(&mut self, message: ()) {
+impl<K: Kernel> Handler<()> for K {
+    fn on_message(&mut self, _message: ()) {
         // discard
-
     }
 }
 
@@ -103,15 +104,30 @@ impl IrqRegistry {
     pub fn register(&mut self, irq: u8, interrupt: &'static dyn Interruptable) {
         self.entries.push(
             IrqEntry {
-                irq,
+                irq: irq,
                 interrupt,
             }
-        );
+        ).ok().unwrap();
     }
 
     pub fn interrupt(&self, irqn: i16) {
-        for interrupt in self.entries.iter().filter( |e| e.irq == irqn as u8) {
-            interrupt.interrupt.interrupt(irqn)
+        for interrupt in self.entries.iter().filter(|e| e.irq == irqn as u8) {
+            interrupt.interrupt.interrupt();
+        }
+    }
+
+    pub fn unmask_all(&self) {
+        for irq in self.entries.iter().map(|e| e.irq) {
+            struct IrqNr(u8);
+            unsafe impl Nr for IrqNr {
+                fn nr(&self) -> u8 {
+                    self.0
+                }
+            }
+
+            unsafe {
+                NVIC::unmask(IrqNr(irq));
+            }
         }
     }
 }

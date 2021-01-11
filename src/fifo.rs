@@ -24,7 +24,7 @@ impl Signaller {
     }
 
     pub fn wake(&self) {
-        let mut waker = self.waker.borrow_mut().take();
+        let waker = self.waker.borrow_mut().take();
         if let Some(waker) = waker {
             waker.wake()
         }
@@ -68,7 +68,8 @@ impl<'q, T, N: ArrayLength<T>> AsyncProducer<'q, T, N> {
         }
     }
     pub fn enqueue(&mut self, item: T) {
-        self.inner.enqueue(item);
+        // TODO: handle rejection policy
+        self.inner.enqueue(item).ok().unwrap();
         self.signaller.wake();
     }
 }
