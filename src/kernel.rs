@@ -1,20 +1,23 @@
-use std::cell::UnsafeCell;
+use core::cell::UnsafeCell;
 use crate::sink::{Sink, Handler};
 use crate::component::Component;
-use crate::container::Container;
+use heapless::{
+    String,
+    consts::*,
+};
 
 pub trait Kernel : Sized {
-    fn start(&'static self, ctx: &'static KernelStartContext<Self>);
+    fn start(&'static self, ctx: &'static KernelContext<Self>);
 }
 
-pub struct KernelContext<K: Kernel>
+pub struct ConnectedKernel<K: Kernel>
 where K: 'static
 {
     kernel: UnsafeCell<K>,
-    context: UnsafeCell<Option<KernelStartContext<K>>>,
+    context: UnsafeCell<Option<KernelContext<K>>>,
 }
 
-impl<K: Kernel> KernelContext<K> {
+impl<K: Kernel> ConnectedKernel<K> {
     pub fn new(kernel: K) -> Self {
         Self {
             kernel: UnsafeCell::new(kernel),
@@ -23,7 +26,7 @@ impl<K: Kernel> KernelContext<K> {
     }
 
     pub fn start(&'static self) {
-        let start_context = KernelStartContext::new(&self);
+        let start_context = KernelContext::new(&self);
         unsafe {
             (&mut *self.context.get()).replace(start_context);
             (&mut *self.kernel.get()).start( (&*self.context.get()).as_ref().unwrap() );
@@ -31,25 +34,26 @@ impl<K: Kernel> KernelContext<K> {
     }
 }
 
-pub struct KernelStartContext<K: Kernel>
+pub struct KernelContext<K: Kernel>
     where K: 'static
 {
-    kernel: &'static KernelContext<K>,
+    kernel: &'static ConnectedKernel<K>,
 }
 
-impl<K: Kernel> KernelStartContext<K> {
-    pub fn new(kernel: &'static KernelContext<K>) -> Self {
+impl<K: Kernel> KernelContext<K> {
+    pub fn new(kernel: &'static ConnectedKernel<K>) -> Self {
         Self {
             kernel
         }
     }
 }
 
-impl<M, K: Kernel> Sink<M> for KernelStartContext<K>
+impl<M, K: Kernel> Sink<M> for KernelContext<K>
     where K: Handler<M>
 {
     fn send(&self, message: M) {
         unsafe { &mut *self.kernel.kernel.get() }.on_message(message)
     }
 }
+
 

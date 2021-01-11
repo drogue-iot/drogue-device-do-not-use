@@ -1,18 +1,19 @@
+#![no_std]
+
 mod fifo;
 mod sink;
 mod kernel;
-mod container;
 mod component;
 mod interrupt;
 mod macros;
 
 #[cfg(test)]
 mod tests {
-    use crate::sink::Handler;
-    use crate::kernel::{Kernel, KernelContext, KernelStartContext};
-    use crate::container::{Container, ContainerStartContext, ContainerContext};
-    use crate::component::{Component, ComponentStartContext, ComponentContext};
-    use crate::interrupt::{Interrupt, InterruptContext};
+    use crate::sink::{Handler, Sink};
+    use crate::kernel::{Kernel, ConnectedKernel, KernelContext};
+    use crate::component::{Component, ComponentContext, ConnectedComponent};
+    use crate::interrupt::{Interrupt, ConnectedInterrupt};
+    use drogue_async::task::spawn;
 
     pub enum ButtonEvent {
         Pressed,
@@ -36,23 +37,22 @@ mod tests {
         type InboundMessage = LEDState;
         type OutboundMessage = ();
 
-        fn start(&mut self, ctx: &'static ComponentStartContext<Self>) {
-            println!("starting LED");
+        fn start(&mut self, ctx: &'static ComponentContext<Self>) {
+            spawn("led", async move {
+                loop {
+                    let message = ctx.receive().await;
+                    match message {
+                        LEDState::On => {}
+                        LEDState::Off => {}
+                    }
+                }
+            });
         }
     }
 
     pub struct Flashlight {
-        led: ComponentContext<LED>,
-        button: InterruptContext<Button>,
-    }
-
-    impl Flashlight {}
-
-    impl Container for Flashlight {
-        fn start<K:Kernel>(&'static self, context: &'static ContainerStartContext<Self>) {
-            self.led.start(context);
-            self.button.start(context);
-        }
+        led: ConnectedComponent<LED>,
+        button: ConnectedInterrupt<Button>,
     }
 
     pub enum FlashlightStatus {
@@ -79,12 +79,18 @@ mod tests {
     }
 
     struct Device {
-        flashlight: ContainerContext<Flashlight>,
+        flashlight: ConnectedComponent<Flashlight>,
     }
 
     impl Kernel for Device {
-        fn start(&'static self, ctx: &'static KernelStartContext<Self>) {
+        fn start(&'static self, ctx: &'static KernelContext<Self>) {
             self.flashlight.start(ctx);
+        }
+    }
+
+    impl Handler<FlashlightStatus> for Device {
+        fn on_message(&mut self, message: FlashlightStatus) {
+            unimplemented!()
         }
     }
 
@@ -93,12 +99,12 @@ mod tests {
         use crate::device;
 
         let flashlight = Flashlight {
-            led: ComponentContext::new(LED {}),
-            button: InterruptContext::new(Button {}),
+            led: ConnectedComponent::new(LED {}),
+            button: ConnectedInterrupt::new(Button {}),
         };
 
         let kernel = Device {
-            flashlight: ContainerContext::new(flashlight),
+            flashlight: ConnectedComponent::new(flashlight),
         };
 
         device!( Device => kernel);

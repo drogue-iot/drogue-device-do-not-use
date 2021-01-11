@@ -1,12 +1,12 @@
 use core::task::Context as FutureContext;
 use core::cell::RefCell;
-use std::task::{Waker, Context, Poll};
+use core::task::{Waker, Context, Poll};
 use crate::component::Component;
 use heapless::ArrayLength;
 use heapless::spsc::{Queue, Producer, Consumer};
-use std::cell::UnsafeCell;
-use std::future::Future;
-use std::pin::Pin;
+use core::cell::UnsafeCell;
+use core::future::Future;
+use core::pin::Pin;
 
 pub struct Signaller {
     waker: RefCell<Option<Waker>>,
