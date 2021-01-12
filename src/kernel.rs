@@ -34,7 +34,7 @@ impl<K: Kernel> ConnectedKernel<K> {
         let context = KernelContext::new(&self);
         unsafe {
             (&mut *self.context.get()).replace(context);
-            (&mut *self.kernel.get()).start(
+            (&*self.kernel.get()).start(
                 (&*self.context.get()).as_ref().unwrap()
             );
         }
@@ -100,7 +100,7 @@ impl IrqRegistry {
     pub fn register(&mut self, irq: u8, interrupt: &'static dyn Interruptable) {
         self.entries.push(
             IrqEntry {
-                irq: irq,
+                irq,
                 interrupt,
             }
         ).ok().unwrap();
@@ -125,6 +125,12 @@ impl IrqRegistry {
                 NVIC::unmask(IrqNr(irq));
             }
         }
+    }
+}
+
+impl Default for IrqRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

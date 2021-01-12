@@ -18,14 +18,14 @@ pub struct ComponentContext<C: Component>
     where C: 'static
 {
     component: &'static ConnectedComponent<C>,
-    pub(crate) consumer: UnsafeCell<AsyncConsumer<'static, C::InboundMessage, U32>>,
-    pub(crate) upstream: &'static dyn UpstreamContext<C::OutboundMessage>,
+    consumer: UnsafeCell<AsyncConsumer<'static, C::InboundMessage, U32>>,
+    upstream: &'static dyn UpstreamContext<C::OutboundMessage>,
 }
 
 impl<C: Component> ComponentContext<C> {
     fn new(component: &'static ConnectedComponent<C>, consumer: AsyncConsumer<'static, C::InboundMessage, U32>, upstream: &'static dyn UpstreamContext<C::OutboundMessage>) -> Self {
         Self {
-            component: component,
+            component,
             consumer: UnsafeCell::new(consumer),
             upstream,
         }
