@@ -1,4 +1,4 @@
-use core::cell::UnsafeCell;
+use core::cell::{UnsafeCell, RefCell};
 use crate::sink::{Sink, Handler};
 use crate::context::UpstreamContext;
 use crate::interrupt::Interruptable;
@@ -18,7 +18,7 @@ pub struct ConnectedKernel<K: Kernel>
 {
     kernel: UnsafeCell<K>,
     context: UnsafeCell<Option<KernelContext<K>>>,
-    irq_registry: UnsafeCell<IrqRegistry>,
+    irq_registry: RefCell<IrqRegistry>,
 }
 
 impl<K: Kernel> ConnectedKernel<K> {
@@ -26,7 +26,7 @@ impl<K: Kernel> ConnectedKernel<K> {
         Self {
             kernel: UnsafeCell::new(kernel),
             context: UnsafeCell::new(None),
-            irq_registry: UnsafeCell::new(IrqRegistry::new()),
+            irq_registry: RefCell::new(IrqRegistry::new()),
         }
     }
 
@@ -37,14 +37,12 @@ impl<K: Kernel> ConnectedKernel<K> {
             (&mut *self.kernel.get()).start(
                 (&*self.context.get()).as_ref().unwrap()
             );
-            (&*self.irq_registry.get()).unmask_all();
         }
+        self.irq_registry.borrow().unmask_all();
     }
 
     pub fn interrupt(&self, irqn: i16) {
-        unsafe {
-            (&*self.irq_registry.get()).interrupt(irqn);
-        }
+        self.irq_registry.borrow().interrupt(irqn);
     }
 }
 
@@ -78,9 +76,7 @@ impl<M, K: Kernel> UpstreamContext<M> for KernelContext<K>
     }
 
     fn register_irq(&self, irq: u8, interrupt: &'static dyn Interruptable) {
-        unsafe {
-            (&mut *self.kernel.irq_registry.get()).register(irq, interrupt);
-        }
+        self.kernel.irq_registry.borrow_mut().register(irq, interrupt);
     }
 }
 
