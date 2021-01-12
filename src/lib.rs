@@ -1,21 +1,54 @@
 #![no_std]
 
-mod fifo;
-pub mod sink;
+/// Support for the root a component tree.
 pub mod kernel;
+
+/// Support for leaf or non-leaf components in a tree.
 pub mod component;
+
+/// Support for IRQ-based components.
 pub mod interrupt;
-pub mod macros;
+
+#[doc(hidden)]
 pub mod context;
 
-pub extern crate drogue_async;
+#[doc(hidden)]
+pub mod macros;
+
+/// Support for handling messages outbound from child to parent.
+pub mod handler;
+
+mod fifo;
+
+/// Quick imports of common traits and structs.
+pub mod prelude {
+    pub use crate::{
+        kernel::{
+            Kernel,
+            KernelContext,
+        },
+        component::{
+            Component,
+            ConnectedComponent,
+            ComponentContext,
+            spawn,
+        },
+        interrupt::{
+            Interrupt,
+            ConnectedInterrupt,
+            InterruptContext,
+        },
+        handler::Handler,
+        device,
+    };
+}
 
 #[cfg(test)]
 mod tests {
-    use crate::sink::{Handler};
-    use crate::kernel::{Kernel, KernelContext, IrqRegistry};
     use crate::component::{Component, ComponentContext, ConnectedComponent};
-    use crate::interrupt::{Interrupt, ConnectedInterrupt, InterruptContext};
+    use crate::handler::Handler;
+    use crate::interrupt::{ConnectedInterrupt, Interrupt, InterruptContext};
+    use crate::kernel::{Kernel, KernelContext};
     use drogue_async::task::spawn;
 
     pub enum ButtonEvent {

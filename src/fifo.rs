@@ -1,12 +1,12 @@
-use core::task::Context as FutureContext;
-use core::cell::RefCell;
-use core::task::{Waker, Poll};
 use crate::component::Component;
-use heapless::ArrayLength;
-use heapless::spsc::{Queue, Producer, Consumer};
+use core::cell::RefCell;
 use core::cell::UnsafeCell;
 use core::future::Future;
 use core::pin::Pin;
+use core::task::Context as FutureContext;
+use core::task::{Poll, Waker};
+use heapless::spsc::{Consumer, Producer, Queue};
+use heapless::ArrayLength;
 
 pub struct Signaller {
     waker: RefCell<Option<Waker>>,
@@ -15,7 +15,7 @@ pub struct Signaller {
 impl Signaller {
     pub fn new() -> Self {
         Self {
-            waker: RefCell::new(None)
+            waker: RefCell::new(None),
         }
     }
 
@@ -44,7 +44,12 @@ impl<C: Component, N: ArrayLength<C::InboundMessage>> AsyncFifo<C, N> {
         }
     }
 
-    pub fn split(&mut self) -> (AsyncProducer<C::InboundMessage, N>, AsyncConsumer<C::InboundMessage, N>) {
+    pub fn split(
+        &mut self,
+    ) -> (
+        AsyncProducer<C::InboundMessage, N>,
+        AsyncConsumer<C::InboundMessage, N>,
+    ) {
         let (producer, consumer) = self.queue.split();
 
         (
@@ -54,14 +59,13 @@ impl<C: Component, N: ArrayLength<C::InboundMessage>> AsyncFifo<C, N> {
     }
 }
 
-
 pub struct AsyncProducer<'q, T, N: ArrayLength<T>> {
     inner: Producer<'q, T, N>,
     signaller: &'q Signaller,
 }
 
 impl<'q, T, N: ArrayLength<T>> AsyncProducer<'q, T, N> {
-    pub fn new(producer: Producer<'q, T,N>, signaller: &'q Signaller) -> Self {
+    pub fn new(producer: Producer<'q, T, N>, signaller: &'q Signaller) -> Self {
         Self {
             inner: producer,
             signaller,
@@ -74,13 +78,10 @@ impl<'q, T, N: ArrayLength<T>> AsyncProducer<'q, T, N> {
     }
 }
 
-
 pub struct AsyncConsumer<'q, T, N: ArrayLength<T>> {
     inner: Consumer<'q, T, N>,
     signaller: &'q Signaller,
 }
-
-
 
 impl<'q, T, N: ArrayLength<T>> AsyncConsumer<'q, T, N> {
     pub fn new(consumer: Consumer<'q, T, N>, signaller: &'q Signaller) -> Self {
@@ -106,7 +107,7 @@ impl<'q, T, N: ArrayLength<T>> AsyncConsumer<'q, T, N> {
                     if let Some(item) = consumer.dequeue() {
                         Poll::Ready(item)
                     } else {
-                        self.signaller.set_waker( cx.waker().clone() );
+                        self.signaller.set_waker(cx.waker().clone());
                         Poll::Pending
                     }
                 }
@@ -117,8 +118,7 @@ impl<'q, T, N: ArrayLength<T>> AsyncConsumer<'q, T, N> {
             //_marker: PhantomData::default(),
             consumer: UnsafeCell::new(&mut self.inner),
             signaller: self.signaller,
-        }.await
+        }
+        .await
     }
 }
-
-

@@ -1,9 +1,28 @@
-
+/// Configure and start a device `Kernel`.
+///
+/// Additionally, allocate some number of bytes for the async executor.
+///
+/// For example:
+///
+/// ```
+/// use drogue_device::kernel::{Kernel, KernelContext};
+/// use drogue_device::component::ConnectedComponent;
+/// struct MyDevice {
+///    led: ConnectedComponent<LED>,
+/// }
+///
+/// impl Kernel for MyDevice {
+///     fn start(&'static self,ctx: &'static KernelContext<Self>) {
+///         self.led.start( ctx );
+///     }
+/// }
+///
+/// device!( MyDevice => Kernel; 1024 );
+/// ```
 #[macro_export]
 macro_rules! device {
     ($ty:ty => $kernel:expr; $memory:literal) => {
-
-        $crate::drogue_async::init_executor!( memory: $memory );
+        $crate::kernel::init_executor!(memory: $memory);
         static mut KERNEL: Option<$crate::kernel::ConnectedKernel<$ty>> = None;
 
         let kernel = unsafe {
@@ -20,6 +39,6 @@ macro_rules! device {
             }
         }
 
-        $crate::drogue_async::executor::run_forever()
-    }
+        $crate::kernel::run_forever()
+    };
 }
